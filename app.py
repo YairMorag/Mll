@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import numpy as np
+import qrcode
+from PIL import Image
+import io
 
 def load_model():
     """Load the saved model and its components"""
@@ -68,11 +70,20 @@ with col1:
     with row2_col2:
         profession = st.selectbox(
             "מקצוע:",
-            ['teacher', 'doctor', 'engineer', 'other'],
+            ['teacher', 'doctor', 'engineer', 'lawyer', 'accountant', 'nurse', 
+             'technician', 'salesperson', 'self_employed', 'student', 'unemployed', 'other'],
             format_func=lambda x: {
                 'teacher': 'מורה',
-                'doctor': 'רופא',
-                'engineer': 'מהנדס',
+                'doctor': 'רופא/ה',
+                'engineer': 'מהנדס/ת',
+                'lawyer': 'עורך/ת דין',
+                'accountant': 'רואה חשבון',
+                'nurse': 'אח/ות',
+                'technician': 'טכנאי/ת',
+                'salesperson': 'איש/ת מכירות',
+                'self_employed': 'עצמאי/ת',
+                'student': 'סטודנט/ית',
+                'unemployed': 'לא עובד/ת',
                 'other': 'אחר'
             }[x]
         )
@@ -90,6 +101,22 @@ with col2:
         st.warning("⚠️ יחס חוב להכנסה גבוה")
     elif debt_ratio > 0.4:
         st.warning("⚠️ יחס חוב להכנסה בינוני-גבוה")
+
+# מיפוי מקצועות למודל המקורי
+profession_risk_mapping = {
+    'teacher': 'teacher',    # 1
+    'doctor': 'doctor',      # 2
+    'engineer': 'engineer',  # 3
+    'lawyer': 'doctor',      # כמו רופא
+    'accountant': 'engineer',# כמו מהנדס
+    'nurse': 'teacher',      # כמו מורה
+    'technician': 'other',   # 0
+    'salesperson': 'other',  # 0
+    'self_employed': 'other',# 0
+    'student': 'other',      # 0
+    'unemployed': 'other',   # 0
+    'other': 'other'         # 0
+}
 
 def get_risk_category(score):
     """המרת ציון מספרי לקטגוריית סיכון וצבע"""
@@ -116,7 +143,7 @@ if st.button("חשב סיכון", type="primary", use_container_width=True):
 
         # המרת המשתנים הקטגוריים
         input_data['Payment history'] = input_data['Payment history'].map(categorical_mappings['Payment history'])
-        input_data['Profession'] = input_data['Profession'].map(categorical_mappings['Profession'])
+        input_data['Profession'] = input_data['Profession'].map(profession_risk_mapping).map(categorical_mappings['Profession'])
 
         # סילום המשתנים המספריים
         numerical_cols = ['Age', 'Debt amount', 'Family income']
@@ -182,7 +209,11 @@ with st.expander("ℹ️ מידע נוסף על חישוב הסיכון"):
        * גילאי 25-60: סיכון רגיל
        * מתחת ל-25 או מעל 60: תוספת קטנה לסיכון
 
-    4. **מספר ילדים**
+    4. **מקצוע**
+       * משפיע על הערכת היציבות התעסוקתית
+       * מתחשב ברמת ההכנסה הממוצעת במקצוע
+
+    5. **מספר ילדים**
        * משפיע על ההוצאות המשפחתיות
 
     ### סקאלת הציונים (1-10)
@@ -190,3 +221,30 @@ with st.expander("ℹ️ מידע נוסף על חישוב הסיכון"):
     * **4-6**: סיכון בינוני - נדרשת בחינה נוספת
     * **7-10**: סיכון גבוה - סבירות נמוכה להחזר תקין
     """)
+
+# הוספת QR קוד
+with st.expander("🔗 QR Code לגישה מהירה"):
+    app_url = "https://showmethemoney.streamlit.app/"
+    
+    # יצירת QR קוד
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(app_url)
+    qr.make(fit=True)
+
+    # יצירת תמונה
+    qr_image = qr.make_image(fill_color="black", back_color="white")
+    
+    # המרה לפורמט שסטרימליט יכול להציג
+    img_byte_array = io.BytesIO()
+    qr_image.save(img_byte_array, format='PNG')
+    
+    # הצגת ה-QR קוד
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.image(img_byte_array.getvalue(), caption="סרוק כדי לפתוח את האפליקציה", width=300)
+        st.markdown(f"<div style='text-align: center'><a href='{app_url}' target='_blank'>קישור ישיר לאפליקציה</a></div>", unsafe_allow_html=True)
